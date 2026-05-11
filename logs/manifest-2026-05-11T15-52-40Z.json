@@ -1,0 +1,66 @@
+{
+  "run_id": "2026-05-11T15-52-40Z",
+  "mode": "execute",
+  "started_at": "2026-05-11T15:53:09Z",
+  "web_root": "/home/forge/archive.icjia-api.cloud/root/files",
+  "quarantine_root": "/home/forge/archive-quarantine",
+  "keep_json": "keep-2026-05-11.json",
+  "drone_dir": "icjia/drone2026",
+  "extensions": [
+    "pdf",
+    "xlsx",
+    "xls",
+    "docx",
+    "doc",
+    "pptx",
+    "ppt",
+    "rtf",
+    "csv"
+  ],
+  "counts": {
+    "scanned": 9326,
+    "keep_publication": 889,
+    "keep_drone_dir": 333,
+    "skip_other_extension": 626,
+    "move": 7478,
+    "move_total_bytes": 4293051040,
+    "moved": 7478,
+    "errors": 0
+  },
+  "samples": {
+    "move": [
+      "ifvcc/councils/017/17th Circuit FVCC Fact Sheet.pdf",
+      "ifvcc/councils/014/Youth Yellow Pages 2016.pdf",
+      "ifvcc/councils/014/Key Indicators for Family Violence Resource.docx",
+      "ifvcc/councils/014/Youth Yellow Pages 2014.pdf",
+      "ifvcc/councils/007/7th Judicial Circuit Fact Sheet.docx"
+    ],
+    "keep_publication": [
+      "icjia/pdf/compwin99.pdf",
+      "icjia/pdf/brochures/bor_polish.pdf",
+      "icjia/pdf/brochures/bor_english.pdf",
+      "icjia/pdf/brochures/ruvictim.pdf",
+      "icjia/pdf/brochures/vessa.pdf"
+    ],
+    "keep_drone_dir": [
+      "icjia/drone2026/Forest Park Police Department - Policy 1103 - Unmanned Aircraft System (UAS).pdf",
+      "icjia/drone2026/McHenryCityPD_DronesPolicy.pdf",
+      "icjia/drone2026/MokenaPoliceDepartment_DronesPolicy.pdf",
+      "icjia/drone2026/EffinghamPoliceDepartment_DronesPolicy.pdf",
+      "icjia/drone2026/QuincyPD_DronesPolicy.pdf"
+    ],
+    "skip_other_extension": [
+      "ifvcc/councils/004/fvccBROCHURE 9-17-14.pub",
+      "r3/EligibleAreasCensusTracts.json",
+      "r3/R3_site_table_V2.json",
+      "serve.json",
+      "icjia/new/Materials_for_Preliminary_Report_ac0a44d1a8.zip"
+    ]
+  },
+  "keep_missing_from_disk": [],
+  "completed_at": "2026-05-11T16:02:58Z",
+  "timing": {
+    "elapsed_seconds": 589
+  },
+  "empty_dirs_left": 467
+}
