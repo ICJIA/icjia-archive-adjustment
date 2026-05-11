@@ -1,0 +1,44 @@
+================================================================
+quarantine.sh manifest — run 2026-05-11T15-44-48Z  (mode: dry-run)
+================================================================
+
+Web root:        /home/forge/archive.icjia-api.cloud/root/files
+Quarantine:      /home/forge/archive-quarantine
+Keep list:       keep-2026-05-11.json (927 entries)
+Preserved dir:   icjia/drone2026
+Extensions:      pdf,xlsx,xls,docx,doc,pptx,ppt,rtf,csv
+
+COUNTS
+  Files scanned:                9326
+  Keep (publication match):     889
+  Keep (under preserved dir):   333
+  Skip (non-target extension):  626
+  → MOVE:                       7478  (~4094.2 MB)
+
+SAMPLES
+  Would move (first 5):
+    • ifvcc/councils/017/17th Circuit FVCC Fact Sheet.pdf
+    • ifvcc/councils/014/Youth Yellow Pages 2016.pdf
+    • ifvcc/councils/014/Key Indicators for Family Violence Resource.docx
+    • ifvcc/councils/014/Youth Yellow Pages 2014.pdf
+    • ifvcc/councils/007/7th Judicial Circuit Fact Sheet.docx
+  Kept by publication match (first 5):
+    • icjia/pdf/compwin99.pdf
+    • icjia/pdf/brochures/bor_polish.pdf
+    • icjia/pdf/brochures/bor_english.pdf
+    • icjia/pdf/brochures/ruvictim.pdf
+    • icjia/pdf/brochures/vessa.pdf
+  Kept by preserved-dir (first 5):
+    • icjia/drone2026/Forest Park Police Department - Policy 1103 - Unmanned Aircraft System (UAS).pdf
+    • icjia/drone2026/McHenryCityPD_DronesPolicy.pdf
+    • icjia/drone2026/MokenaPoliceDepartment_DronesPolicy.pdf
+    • icjia/drone2026/EffinghamPoliceDepartment_DronesPolicy.pdf
+    • icjia/drone2026/QuincyPD_DronesPolicy.pdf
+  Skipped by extension (first 5):
+    • ifvcc/councils/004/fvccBROCHURE 9-17-14.pub
+    • r3/EligibleAreasCensusTracts.json
+    • r3/R3_site_table_V2.json
+    • serve.json
+    • icjia/new/Materials_for_Preliminary_Report_ac0a44d1a8.zip
+
+DRY RUN — no files were moved. To execute, re-run with --execute.

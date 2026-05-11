@@ -1,7 +1,16 @@
 node_modules/
-logs/
 keep-*.json
-*.log
 .DS_Store
 .env
 .vscode/
+*.log
+
+# logs/ holds runtime output. Most of it is operational noise (lockfile,
+# tmpfiles) and shouldn't be committed. BUT manifests, moves logs, restore
+# logs, and error logs are the audit trail — commit those.
+logs/*
+!logs/manifest-*.json
+!logs/manifest-*.txt
+!logs/moves-*.jsonl
+!logs/restores-*.jsonl
+!logs/errors-*.log
