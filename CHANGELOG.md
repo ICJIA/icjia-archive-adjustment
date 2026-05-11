@@ -26,6 +26,10 @@ All notable changes to the archive-quarantine project are documented here. Forma
 - Default extension scope unchanged from design: `pdf,xlsx,xls,docx,doc,pptx,ppt,rtf,csv`.
 - Confirmed live GraphQL endpoint uses snake_case timestamp fields (`created_at`, `updated_at`, `published_at`) alongside camelCase `fileURL`; reflected in both the query and the output schema.
 
+### Documentation
+- **README expanded substantially** with (a) a manager-facing "Why quarantining older orphan files is the wise move" subsection covering the ADA Title II April 2027 deadline, the disproportionate remediation cost of older documents, duplicate-and-stale-version cleanup, legal-exposure reduction, and reversibility; (b) an explicit "Crucially: nothing is deleted; nothing is lost" subsection emphasizing that quarantined files remain on the same server and same disk, accessible to staff via SSH, with one-command restore at any future date; (c) a full **"Production run record — 2026-05-11"** section with UTC timeline, stats table, before/after state transitions, the post-run bug discovery + fix narrative, HTTP-level verification table, and a catalog of audit artifacts committed under `logs/`.
+- Lead paragraph reworded to emphasize *public* web reach (rather than just "web reach") and to state explicitly that quarantined files remain available to staff.
+
 ### Fixed
 - **`normalize.js` now collapses repeated slashes in URL pathnames** (e.g. `/files/icjia/pdf//AtAGlance/...` → `icjia/pdf/AtAGlance/...`). Real filesystem paths never have `//`; preserving them produced a keep-set key that didn't match what `find` returned from disk, so one publication (`vol1_no3_Class4felonyoffenders.pdf`) was misclassified as orphan and moved to quarantine during the 2026-05-11 production run. Caught by post-execute verification, restored via `restore.sh --match`, two regression tests added (`tests 14`–`15`). The dry-run's `keep_missing_from_disk` check used `[ -f ... ]` which collapses `//` at the syscall level, hiding the inconsistency — that's a known limitation but acceptable now that normalization is correct at source.
 

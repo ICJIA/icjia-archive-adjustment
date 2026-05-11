@@ -1,6 +1,8 @@
 # ICJIA Archive Quarantine
 
-A three-tool pipeline that **safely removes unreferenced documents from web reach** on the ICJIA archive file server (`archive.icjia-api.cloud`) — without deleting anything. Files are *moved* to a sibling quarantine directory on the same machine; every move is logged with cryptographic checksums; every move is reversible.
+A three-tool pipeline that **removes unreferenced documents from public web reach** on the ICJIA archive file server (`archive.icjia-api.cloud`) — **without deleting anything**. Quarantined files remain on the same server, on the same disk, and stay fully accessible to staff via SSH — they are simply no longer served to the public over HTTP. Every move is logged with cryptographic checksums, and any individual file (or the entire move) can be restored to its original public-served location at any future date.
+
+> Production run completed **2026-05-11** — see [Production run record](#production-run-record--2026-05-11) below for the full operational log.
 
 > **Repo:** https://github.com/ICJIA/icjia-archive-adjustment
 > **Design doc:** [`docs/archive-quarantine-design.md`](./docs/archive-quarantine-design.md)
@@ -8,26 +10,178 @@ A three-tool pipeline that **safely removes unreferenced documents from web reac
 
 ---
 
-## For non-technical readers — *why does this exist?*
+## For non-technical readers — *why does this exist, and why is it safe?*
 
-ICJIA operates an archive file server that serves PDFs and other documents publicly over HTTP. Most of those files are *not* linked from any current ResearchHub publication — they're older or orphaned assets. But every public-facing document is subject to the federal **ADA Title II web accessibility deadline (April 26, 2027)**.
+ICJIA's archive file server (`archive.icjia-api.cloud`) has accumulated thousands of documents over many years. Most of those documents are **no longer linked from any current ICJIA publication** on the public website. They sit on the server, are still discoverable by direct URL, and are still subject to federal accessibility law.
 
-The Illinois Department of Innovation & Technology (DoIT) recommended a proactive posture: **don't try to remediate everything; instead, take everything off the web that no current publication is actually using.** That dramatically reduces the remediation surface without losing any content.
+### The April 2027 problem
 
-This tool implements that posture in three deliberate steps:
+The federal **ADA Title II Web Content Accessibility rule** (DOJ Interim Final Rule; compliance deadline April 26, 2027) requires every publicly accessible document on a state or local government website to meet WCAG 2.1 Level AA accessibility standards. **Older documents are the hardest to bring up to standard:**
 
-| Step | What it does | Risk if wrong |
+- They were created before accessibility was a routine design consideration.
+- Many are scanned PDFs — text-as-image — with no machine-readable text layer at all.
+- Image-only content lacks alt text and structural tagging.
+- Complex tables, multi-column layouts, and embedded charts often need to be rebuilt from source files that may no longer exist.
+- Older Word and InDesign source files for legacy documents may not be retrievable.
+
+Every public-facing non-compliant document carries real remediation cost: staff time, potential vendor fees, and ongoing legal-exposure risk. With thousands of orphan documents on the archive and a hard federal deadline, **the most cost-effective compliance strategy is to dramatically reduce the surface area that needs remediation in the first place**.
+
+### Why quarantining older orphan files is the wise move
+
+The Illinois Department of Innovation & Technology (DoIT) recommended a proactive posture: **do not attempt to remediate every document; remove from public reach anything no current ICJIA publication is actively using.** This is sound for several converging reasons:
+
+1. **Files that aren't reachable by the public aren't "web content."** Internal records held on a server but not served to the web are out of scope for the federal Title II web rule.
+2. **Older files are disproportionately expensive to remediate.** The further back you go, the more scanned-only PDFs, lost source files, and outdated formatting you encounter. The cost-per-document of bringing pre-2010 material to WCAG 2.1 AA is many times higher than for documents authored under current accessibility practices.
+3. **Many orphan files are duplicates, drafts, or older versions** of documents whose current versions are already on the live website. Quarantining the orphans removes search-engine-indexable duplicates that can confuse users.
+4. **Risk reduction.** Every published-but-unmaintained document is potential legal exposure under Title II. Reducing the inventory reduces the exposure.
+5. **It's reversible.** Any individual file — or all of them — can be returned to its original public-served location in seconds.
+
+### Crucially: nothing is deleted; nothing is lost
+
+**Every quarantined file still exists on the same server, on the same disk.** It just lives in a separate directory (`/home/forge/archive-quarantine/`) that is *not* connected to the web server's serving path. Staff with SSH access can:
+
+- Read, view, or copy any quarantined file with standard filesystem tools
+- Restore an individual file to its original public-served location with one command
+- Restore a whole directory's worth of files using a glob pattern
+- Search the move log by filename, partial filename, or SHA-256 checksum
+
+For example, if a researcher requests a 1985 report that was quarantined, restoring it takes a single command:
+
+```bash
+ssh forge@archive.icjia-api.cloud
+./restore.sh --moves ~/logs/moves-2026-05-11T15-52-40Z.jsonl \
+  --match 'icjia/pdf/AnnualReport/ICJIA 1985 Annual Report.pdf' --execute
+```
+
+Less than 10 seconds later, that file is back at its original public-served location and serving HTTP 200 to anyone who requests its URL.
+
+### The three steps
+
+This tool implements the quarantine-not-delete posture in three deliberate steps, all reversible:
+
+| Step | What it does | Reversibility |
 |---|---|---|
-| **1. Build keep-list** | Asks the GraphQL publications API which documents are currently referenced. Writes a JSON file listing those paths. | Read-only. Nothing changes. |
-| **2. Quarantine** | Walks the archive's filesystem, classifies each file (keep / move / skip), moves the non-referenced ones into a sibling directory that is *not* publicly served. | Defaults to **dry-run** — must pass `--execute` explicitly. Every move is logged with SHA-256. |
-| **3. Restore** | Replays the move log in reverse (all files, by directory, or by filename). Verifies SHA-256 before each restore. | Cannot accidentally clobber existing files; cannot restore files that don't match their original checksum. |
+| **1. Build keep-list** | Queries the GraphQL publications API for the canonical list of currently referenced documents and writes a JSON file listing those paths. | Read-only. No changes anywhere. |
+| **2. Quarantine** | Walks the archive's filesystem, classifies every file (keep / move / skip), and moves the non-referenced ones into a sibling directory on the same disk. | Default behavior is **dry-run** (classify and report only). The `--execute` flag must be passed explicitly to actually move anything. Every move is logged with SHA-256, file size, and timestamps. |
+| **3. Restore** | Replays the move log in reverse — all files, only files in a directory, or one specific file by filename. Verifies the SHA-256 of each file before restoring (defends against corruption or tampering). | Will not clobber an existing file at the destination. Will not restore a file whose checksum has changed. Itself produces a JSONL log so the full move-and-restore history is auditable. |
 
 The pipeline is **conservative by design**:
 
-- Nothing is ever deleted — only moved.
-- The destructive step (Tool 2) only needs the workstation-side keep-list — it has zero network dependencies and zero side effects in its default dry-run mode.
-- Every moved file has its full path, size, mtime, and SHA-256 logged as JSONL. The log alone is sufficient to restore the entire move, indefinitely.
-- A single file can be restored from quarantine in seconds at any future date, by exact name or filename pattern.
+- **Nothing is ever deleted** — only moved between directories on the same disk.
+- **The destructive step needs only the local keep-list** — no internet, no remote dependencies. It can be re-run any time GraphQL is unreachable.
+- **The move log alone is sufficient to restore the entire operation**, indefinitely. Keep the move log and manifests in version control as the audit trail.
+- **Single files can be restored in seconds** at any future date, by exact path, directory glob, or filename pattern.
+
+---
+
+## Production run record — 2026-05-11
+
+This pipeline is intended to be run **exactly once** against a given archive. The execute was performed on **2026-05-11**. This section is the permanent operational record of that run.
+
+### Timeline (UTC)
+
+| Time | What happened |
+|---|---|
+| 14:23 | Built initial `keep-2026-05-11.json` from `https://agency.icjia-api.cloud/graphql` (3 paginated fetches, 1,107 publications). |
+| 15:44 | Production dry-run. Manifest reviewed; confirmed 7,478 candidate moves; 0 keep entries reported missing on disk. |
+| 15:50 | Smoke test `--limit 10 --execute`. 10 files moved successfully, all SHA-logged. |
+| 15:51 | Round-trip test: restored the same 10 files via `restore.sh --all --execute`. Byte-for-byte SHA-256 verified. Live-fire confirmation that quarantine and restore both work on production data. |
+| 15:52 | Full `--execute` begins. |
+| 16:02 | Full `--execute` completes — **7,478 files moved, 0 errors, 589 seconds elapsed** (≈ 9 min 49 s). |
+| 16:16 | Post-run verification: iterated all 890 keep paths against the disk. Found **one missing**. |
+| 16:16 | Misclassified file restored via `restore.sh --match 'icjia/pdf/AtAGlance/vol1_no3_Class4felonyoffenders.pdf' --execute`. |
+| 16:17 | Final verification: 890/890 keep paths present, 333/333 drone-dir files present, HTTP-level spot-checks pass. |
+
+### Stats
+
+| Metric | Value |
+|---|---|
+| Publications in GraphQL endpoint | **1,107** |
+| Publications hosted on archive (kept) | **927** records / **890** unique file paths (some PDFs are referenced by more than one publication record) |
+| Publications hosted elsewhere (researchhub, agency, etc.) — out of scope | 136 |
+| Publications with `null` `fileURL` — no remediation target | 44 |
+| Files scanned in `/home/forge/archive.icjia-api.cloud/root/files` | **9,326** |
+| Files preserved by publication-match rule | 889 |
+| Files preserved by drone-dir rule (`icjia/drone2026/`) | 333 |
+| Files preserved by extension filter (images, markdown, html, zip, etc.) | 626 |
+| **Files moved to quarantine** | **7,478** |
+| Bytes moved | **~4.1 GB** (inode rename only — same filesystem; no actual data copy) |
+| Script-level errors | **0** |
+| Wall time for full execute | **589 seconds** (≈ 9 min 49 s) |
+| Empty directories left in web-root after the move | 467 (not removed; harmless, can be cleaned later with `--clean-empty-dirs`) |
+
+### State transitions
+
+| | Before | After |
+|---|---|---|
+| Files in `/home/forge/archive.icjia-api.cloud/root/files` (web-served) | 9,326 | 1,849 |
+| Files in `/home/forge/archive-quarantine/` (not web-served) | 0 | 7,477 |
+| **Sum** | **9,326** | **9,326** |
+
+1,849 + 7,477 = 9,326 — equal to the pre-run total. Every original file is accounted for.
+
+### Issues found and fixes applied
+
+**Issue: Path-normalization bug (`//` in URL → quarantine miss)**
+
+One publication's GraphQL `fileURL` contained a doubled slash:
+
+```
+https://archive.icjia-api.cloud/files/icjia/pdf//AtAGlance/vol1_no3_Class4felonyoffenders.pdf
+```
+
+The URL constructor preserved the `//` in `url.pathname`; `decodeURIComponent` doesn't collapse it either. So the resulting `keep.json` entry's `path` field was `icjia/pdf//AtAGlance/vol1_no3_Class4felonyoffenders.pdf` — two slashes between `pdf` and `AtAGlance`.
+
+Meanwhile, `find` on the actual filesystem returns paths with single slashes. The bash string-equality lookup in `quarantine.sh` (`if [[ -n "${KEEP_SET[$rel]:-}" ]]`) compared the single-slash filesystem path against the double-slash key — they didn't match. The file was therefore classified as orphan and moved to quarantine, when it should have been preserved as a publication file.
+
+The dry-run included a `keep_missing_from_disk` integrity check using bash `[ -f "$WEB_ROOT/$path" ]`. The kernel collapses `//` to `/` at the filesystem-syscall layer, so `[ -f ]` returned true (the file *did* exist at the equivalent single-slash path) even though the string-based KEEP_SET lookup would miss. **The inconsistency was invisible at dry-run time.** That masking is a known limitation of `[ -f ]`-based checks against string-equality lookups; the right fix is at the source of truth.
+
+**Fix applied** — commit [`72def33`](https://github.com/ICJIA/icjia-archive-adjustment/commit/72def33):
+
+1. **`lib/normalize.js`** now collapses repeated slashes after stripping the URL prefix:
+   ```js
+   const path = decoded.slice(urlPrefix.length).replace(/\/+/g, '/');
+   ```
+2. **Two regression tests added** (`test/normalize.test.js` cases 14–15): double-slash and triple-slash URL pathnames both normalize to single-slash filesystem paths. **18/18** unit tests now pass.
+3. **The misclassified file was restored** via the existing `restore.sh --match` mechanism — the exact use case the selective-restore feature was built for:
+   ```bash
+   ./restore.sh --moves ~/logs/moves-2026-05-11T15-52-40Z.jsonl \
+     --match 'icjia/pdf/AtAGlance/vol1_no3_Class4felonyoffenders.pdf' --execute
+   ```
+   Restore completed in 0 seconds; SHA-256 verified before placement.
+4. The restore log (`logs/restores-2026-05-11T16-16-32Z.jsonl`) is committed to this repo for completeness.
+
+**Post-fix verification:**
+
+- 18/18 unit tests pass.
+- 890/890 keep-set paths verified present on disk via filesystem check (was 889/890 before the fix).
+- 333/333 drone-dir files verified present.
+- HTTP 200 returned for the restored file URL.
+
+### Final HTTP-level verification
+
+After execute and bug-fix restore:
+
+| URL | Expected | Actual |
+|---|---|---|
+| `…/files/icjia/pdf/compwin99.pdf` (publication-linked) | 200 | **200** |
+| `…/files/icjia/drone2026/McHenryCityPD_DronesPolicy.pdf` (drone-dir) | 200 | **200** |
+| `…/files/icjia/pdf/AtAGlance/vol1_no3_Class4felonyoffenders.pdf` (was wrongly quarantined; restored) | 200 | **200** |
+| `…/files/ifvcc/councils/017/17th%20Circuit%20FVCC%20Fact%20Sheet.pdf` (correctly quarantined) | 404 | **404** |
+
+### Audit artifacts (committed under `logs/`)
+
+| File | Size | What it captures |
+|---|---|---|
+| `manifest-2026-05-11T15-44-48Z.json` / `.txt` | 1.8 KB / 1.9 KB | Dry-run baseline (read-only classification) |
+| `manifest-2026-05-11T15-50-57Z.json` / `.txt` | 1.9 KB / 2.0 KB | Smoke-test (`--limit 10 --execute`) manifest |
+| `moves-2026-05-11T15-50-57Z.jsonl` | small | Smoke-test moves (10 entries) |
+| `restores-2026-05-11T15-51-24Z.jsonl` | small | Smoke-test restores (10 entries) |
+| **`manifest-2026-05-11T15-52-40Z.json` / `.txt`** | small | **Full-execute manifest (canonical)** |
+| **`moves-2026-05-11T15-52-40Z.jsonl`** | **3.5 MB** | **Full-execute moves log (7,478 entries) — the restore source-of-truth** |
+| `restores-2026-05-11T16-16-32Z.jsonl` | small | Bug-fix restore (1 entry) |
+
+The single most-load-bearing artifact for any future restore is **`logs/moves-2026-05-11T15-52-40Z.jsonl`**. Each of its 7,478 lines is a JSON object containing `src_rel`, `src_abs`, `dst_abs`, `size`, `sha256`, `mtime`, and `run_id`. Any subset of files can be restored at any future date — months or years from now — by passing that file to `restore.sh --match`. **Treat it as permanent record-keeping evidence; do not delete or modify it.**
 
 ---
 
