@@ -1,0 +1,15 @@
+{
+  "name": "archive-quarantine",
+  "version": "0.1.0",
+  "description": "Tool 1: build a keep-list from the ICJIA publications GraphQL endpoint.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build-keep-list": "node build-keep-list.js"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
