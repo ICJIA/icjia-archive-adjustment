@@ -26,7 +26,11 @@ All notable changes to the archive-quarantine project are documented here. Forma
 - Default extension scope unchanged from design: `pdf,xlsx,xls,docx,doc,pptx,ppt,rtf,csv`.
 - Confirmed live GraphQL endpoint uses snake_case timestamp fields (`created_at`, `updated_at`, `published_at`) alongside camelCase `fileURL`; reflected in both the query and the output schema.
 
+### Fixed
+- **`normalize.js` now collapses repeated slashes in URL pathnames** (e.g. `/files/icjia/pdf//AtAGlance/...` → `icjia/pdf/AtAGlance/...`). Real filesystem paths never have `//`; preserving them produced a keep-set key that didn't match what `find` returned from disk, so one publication (`vol1_no3_Class4felonyoffenders.pdf`) was misclassified as orphan and moved to quarantine during the 2026-05-11 production run. Caught by post-execute verification, restored via `restore.sh --match`, two regression tests added (`tests 14`–`15`). The dry-run's `keep_missing_from_disk` check used `[ -f ... ]` which collapses `//` at the syscall level, hiding the inconsistency — that's a known limitation but acceptable now that normalization is correct at source.
+
 ### Verified
-- Tool 1 unit tests: 16/16 pass.
-- Tool 1 live smoke test against `https://agency.icjia-api.cloud/graphql`: 1,107 publications fetched across 3 pages; 927 kept (884 unique archive-hosted files plus 6 on the `archive.icjia.cloud` DNS alias); 44 with null `fileURL`; 136 on non-archive hosts.
+- Tool 1 unit tests: **18/18** pass (16 original + 2 regression tests for the double-slash bug).
+- Tool 1 live smoke test against `https://agency.icjia-api.cloud/graphql`: 1,107 publications fetched across 3 pages; 927 kept (890 unique paths); 44 with null `fileURL`; 136 on non-archive hosts.
 - Tool 2 & 3 sandboxed integration test against `/tmp/quarantine-test/` on the production server (ext4, GNU coreutils, real conditions but isolated dir): exact-match restore, fuzzy-match restore, and full-replay restore all succeed; SHA-256 of restored files byte-for-byte matches originals.
+- **Production run 2026-05-11 15:52 UTC**: 7,478 files quarantined in 589 seconds, 0 errors at script level. Post-run integrity check found the 1 path-normalization bug above; corrected. Final state: 890/890 keep paths present on disk, 333/333 drone files intact, HTTP 200 on kept + drone paths, HTTP 404 on quarantined paths.

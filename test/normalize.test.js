@@ -156,6 +156,33 @@ test('directory case is preserved (lowercase)', () => {
   assert.equal(result.path, 'icjia/pdf/compiler/X.pdf');
 });
 
+test('doubled slash in URL pathname is collapsed to single slash', () => {
+  const result = normalizePublication(
+    {
+      title: 't',
+      slug: 's',
+      fileURL: 'https://archive.icjia-api.cloud/files/icjia/pdf//AtAGlance/vol1_no3_Class4felonyoffenders.pdf'
+    },
+    opts
+  );
+  assert.deepEqual(result, {
+    ok: true,
+    path: 'icjia/pdf/AtAGlance/vol1_no3_Class4felonyoffenders.pdf'
+  });
+});
+
+test('triple slash in URL pathname is collapsed to single slash', () => {
+  const result = normalizePublication(
+    {
+      title: 't',
+      slug: 's',
+      fileURL: 'https://archive.icjia-api.cloud/files/a///b.pdf'
+    },
+    opts
+  );
+  assert.equal(result.path, 'a/b.pdf');
+});
+
 test('host matching: second allowed host (archive.icjia.cloud) returns ok', () => {
   const optsMulti = {
     archiveHosts: ['archive.icjia-api.cloud', 'archive.icjia.cloud'],
